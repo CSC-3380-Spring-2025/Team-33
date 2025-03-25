@@ -1,10 +1,10 @@
-# [Name of the Project] : [Team Number]
+# Waypoint : Team 33
 # Members
-Project Manager: [Name] ([GitHub Name])\
-Communications Lead: [Name] ([GitHub Name])\
-Git Master: [Name] ([GitHub Name])\
-Design Lead: [Name] ([GitHub Name])\
-Quality Assurance Tester: [Name] ([GitHub Name])
+Project Manager: Marcus Hudson (mmarcvss)\
+Communications Lead: Caden Guidry (cadengui1010)\
+Git Master: Johnathan Bordenave (Johnunist)\
+Design Lead: Md Islam (misla69)\
+Quality Assurance Tester: Morris Henry (Mo-Henry)
 
 # About Our Software
 
@@ -16,7 +16,7 @@ Describe a little about what the project is about here.
 - Linux
 - Windows
 # Important Links
-Kanban Board: [link]\
+Kanban Board: https://lsu-team-33.atlassian.net/jira/software/projects/KAN/boards/1?atlOrigin=eyJwIjoiaiIsImkiOiI5MGJkMDc2MTFlYzM0NDdiODBkZGVjNjdhNDhhYzk0YiJ9&cloudId=55506117-ed1e-462b-be62-2de0d3c51b2f\
 Designs: [link]\
 Styles Guide(s): [link]
 
