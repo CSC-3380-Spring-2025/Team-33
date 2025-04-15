@@ -229,6 +229,17 @@ export default function Events() {
           </Pressable>
         </View>
       </View>
+      
+      {/* Dashboard at the bottom */}
+      <View style={styles.dashboard}>
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.push("/friends" as const)} // Navigate to friends list
+        >
+          <Ionicons name="people" size={24} color="#fff" />
+          <Text style={styles.dashboardText}>Friends</Text>
+        </Pressable>
+      </View>
     </LinearGradient>
   );
 }
@@ -276,6 +287,23 @@ const styles = StyleSheet.create({
   rewardsText: {
     color: "#fff",
     fontSize: 14,
+  },
+  dashboard: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1b1b3a",
+    paddingVertical: 20, // Increased from 10 to 20 to make the dashboard taller
+  },
+  dashboardButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  dashboardText: {
+    color: "#fff",
+    fontSize: 14,
+    marginLeft: 8,
   },
 });
 
