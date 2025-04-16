@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { EvilIcons, Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import { StyleSheet, Text, TextInput, View, Pressable, Alert } from "react-native";
 import { useRouter } from "expo-router";
@@ -56,25 +56,25 @@ export default function LoginPage() {
     return (
         <View style={styles.container}>
             <View style={styles.logo}>
-                <Ionicons name="calendar-outline" size={160} color="black" />
+                <Ionicons name="calendar-outline" size={160} color="white" />
                 <Text style={styles.title}>Welcome to Waypoint</Text>
             </View>
             <View style={styles.formInputWrapper}>
-                <Ionicons name="person-outline" size={24} color="black" />
+                <Ionicons name="person-outline" size={24} color="white" />
                 <TextInput
                     style={styles.input}
                     placeholder="Username"
-                    placeholderTextColor={"#000"}
+                    placeholderTextColor={"#fff"}
                     value={username}
                     onChangeText={setUsername}
                 />
             </View>
             <View style={styles.formInputWrapper}>
-                <Ionicons name="lock-closed-outline" size={24} color="black" />
+                <Ionicons name="lock-closed-outline" size={24} color="white" />
                 <TextInput
                     style={styles.input}
                     placeholder="Password"
-                    placeholderTextColor={"#000"}
+                    placeholderTextColor={"#fff"}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={!isPasswordVisible}
@@ -84,7 +84,7 @@ export default function LoginPage() {
                 </Pressable>
             </View>
             <Pressable
-                style={{ ...styles.loginButton, backgroundColor: "#000" }}
+                style={{ ...styles.loginButton, backgroundColor: "#6c5ce7" }}
                 onPress={handleLogin}
             >
                 <Text style={styles.buttonText}>Login</Text>
@@ -95,6 +95,7 @@ export default function LoginPage() {
 
 const styles = StyleSheet.create({
     container: {
+        backgroundColor: "#1b1b3a",
         flex: 1,
         width: "100%",
         justifyContent: "center",
@@ -103,7 +104,7 @@ const styles = StyleSheet.create({
     formInputWrapper: {
         width: "90%",
         height: 55,
-        backgroundColor: "#f7f9ef",
+        backgroundColor: "#2c2c54",
         borderWidth: 1,
         borderColor: "#000",
         borderRadius: 6,
@@ -118,6 +119,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     title: {
+        color: "#fff",
         fontSize: 24,
         fontWeight: "bold",
         marginBottom: 20,
@@ -128,6 +130,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     loginButton: {
+        backgroundColor: "#1b1b3a",
         width: "75%",
         height: 55,
         justifyContent: "center",
