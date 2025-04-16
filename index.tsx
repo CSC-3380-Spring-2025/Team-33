@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import dayjs from "dayjs";
+import { Ionicons } from "@expo/vector-icons"; // Import icons from Expo
 
 // Custom type for marking streak days on the calendar
 type MarkedDates = {
@@ -229,7 +230,7 @@ export default function Events() {
           </Pressable>
         </View>
       </View>
-      
+
       {/* Dashboard at the bottom */}
       <View style={styles.dashboard}>
         <Pressable
@@ -238,6 +239,14 @@ export default function Events() {
         >
           <Ionicons name="people" size={24} color="#fff" />
           <Text style={styles.dashboardText}>Friends</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.push("/map" as const)} // Navigate to map page
+        >
+          <Ionicons name="earth" size={24} color="#fff" />
+          <Text style={styles.dashboardText}>Map</Text>
         </Pressable>
       </View>
     </LinearGradient>
@@ -290,10 +299,10 @@ const styles = StyleSheet.create({
   },
   dashboard: {
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "space-around", // Space out buttons evenly
     alignItems: "center",
     backgroundColor: "#1b1b3a",
-    paddingVertical: 20, // Increased from 10 to 20 to make the dashboard taller
+    paddingVertical: 20,
   },
   dashboardButton: {
     flexDirection: "row",
@@ -306,7 +315,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
-
 
 
 
