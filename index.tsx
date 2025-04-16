@@ -4,8 +4,8 @@ import {
   StyleSheet,
   Pressable,
   Text,
-  TextStyle,
-  ViewStyle,
+  FlatList,
+  Alert,
   Image,
 } from "react-native";
 import { Calendar, DateData } from "react-native-calendars";
@@ -14,129 +14,149 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import dayjs from "dayjs";
-import { Ionicons } from "@expo/vector-icons"; // Import icons from Expo
+import { Ionicons } from "@expo/vector-icons";
+import { addPoints } from "./streaks"; // Import point tracking functions
 
-// Custom type for marking streak days on the calendar
 type MarkedDates = {
   [date: string]: {
-    customStyles: {
+    marked?: boolean;
+    dotColor?: string;
+    customStyles?: {
       container?: ViewStyle;
       text?: TextStyle;
     };
   };
 };
 
+type Event = {
+  id: string;
+  date: string;
+  name: string;
+};
+
 export default function Events() {
   const navigation = useNavigation();
   const router = useRouter();
 
-  // Streak data
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [totalPoints, setTotalPoints] = useState(0);
-  const [streakDates, setStreakDates] = useState<string[]>([]);
+  // State to track marked dates, events, selected date, and user avatar
   const [markedDates, setMarkedDates] = useState<MarkedDates>({});
-
-  // User avatar image URL
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [eventName, setEventName] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
 
-  // Threshold for full progress bar (e.g. unlock reward)
-  const maxPoints = 1000;
+  // Progress bar state to track user points
+  const [totalPoints, setTotalPoints] = useState(0);
+  const maxPoints = 1000; // Max points for the progress bar (to be decided)
 
-  // Load streak, points, calendar marks, and avatar from storage on mount
-  useEffect(() => {
-    const loadData = async () => {
-      const streak = await AsyncStorage.getItem("streak");
-      const points = await AsyncStorage.getItem("totalPoints");
-      const storedDates = await AsyncStorage.getItem("streakDates");
-      const avatarUrl = await AsyncStorage.getItem("avatar");
-
-      if (streak) setCurrentStreak(parseInt(streak));
-      if (points) setTotalPoints(parseInt(points));
-      if (storedDates) {
-        const parsed = JSON.parse(storedDates);
-        setStreakDates(parsed);
-        updateMarkedDates(parsed);
+  // When a date is pressed on the calendar, prompt the user to add an event
+  const handleDayPress = (day: DateData) => {
+    setSelectedDate(day.dateString);
+    setEventName("");
+    Alert.prompt(
+      "Add Event",
+      `Enter a name for the event on ${day.dateString}:`,
+      (text) => {
+        if (text) {
+          addEvent(day.dateString, text);
+        }
       }
-      if (avatarUrl) setAvatar(avatarUrl);
+    );
+  };
+
+  // Adds the event to the selected date
+  const addEvent = (date: string, name: string) => {
+    const newEvent: Event = {
+      id: `${date}-${name}`, // Unique IDs for the events
+      date,
+      name,
     };
 
-    loadData();
+    // Add the events to the list
+    setEvents((prevEvents) => [...prevEvents, newEvent]);
+
+    // Adds the little icon to the calendar for dates with events.
+    setMarkedDates((prevMarkedDates) => ({
+      ...prevMarkedDates,
+      [date]: {
+        ...prevMarkedDates[date],
+        marked: true,
+        dotColor: "red",
+      },
+    }));
+
+    // Save the updated events to asyncStorage (hopefully)
+    AsyncStorage.setItem("events", JSON.stringify([...events, newEvent]));
+  };
+
+  // Remove event from the list and update calendar
+  const removeEvent = (eventId: string) => {
+    const updatedEvents = events.filter((event) => event.id !== eventId);
+    setEvents(updatedEvents);
+
+    // Update marked days on the calendar
+    const updatedMarkedDates = { ...markedDates };
+
+    // Clear red dots for dates with no events for real this time.
+    Object.keys(markedDates).forEach((date) => {
+      if (!updatedEvents.some((event) => event.date === date)) {
+        delete updatedMarkedDates[date]; // Remove the dot if no events remain for this date
+      }
+    });
+
+    setMarkedDates(updatedMarkedDates);
+
+    // Save the updated events to AsyncStorage
+    AsyncStorage.setItem("events", JSON.stringify(updatedEvents));
+  };
+
+  // functionality for the complete button, adds points and removes the event
+  const handleCompleteEvent = async (eventId: string) => {
+    await addPoints(10); // Add 10 points for completing event for now
+    const updatedPoints = await AsyncStorage.getItem("totalPoints");
+    setTotalPoints(updatedPoints ? parseInt(updatedPoints, 10) : 0); // Update the progress bar
+    removeEvent(eventId); // ovbiously 
+  };
+
+  // Load events and marked dates from AsyncStorage when the app starts
+  useEffect(() => {
+    const loadEvents = async () => {
+      const storedEvents = await AsyncStorage.getItem("events");
+      const avatarUrl = await AsyncStorage.getItem("avatar");
+
+      if (storedEvents) {
+        const parsedEvents: Event[] = JSON.parse(storedEvents);
+        setEvents(parsedEvents);
+
+        // Add red dots for all the events
+        const newMarkedDates: MarkedDates = {};
+        parsedEvents.forEach((event) => {
+          newMarkedDates[event.date] = {
+            marked: true,
+            dotColor: "red",
+          };
+        });
+        setMarkedDates(newMarkedDates);
+      }
+
+      if (avatarUrl) setAvatar(avatarUrl); // Load the user avatar
+    };
+
+    loadEvents();
   }, []);
 
-  // Create calendar marking object for highlighted streak dates
-  const updateMarkedDates = (dates: string[]) => {
-    const marks: MarkedDates = {};
-    dates.forEach((date) => {
-      marks[date] = {
-        customStyles: {
-          container: {
-            backgroundColor: "#6c5ce7",
-            borderRadius: 6,
-          },
-          text: {
-            color: "#fff",
-            fontWeight: "bold",
-          },
-        },
-      };
-    });
-    setMarkedDates(marks);
-  };
-
-  // Handle daily check-in logic
-  const handleDayPress = async (day: DateData) => {
-    const today = dayjs().format("YYYY-MM-DD");
-
-    // Only allow today's check-in
-    if (day.dateString !== today) return;
-
-    const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
-    const lastDate = streakDates[streakDates.length - 1];
-
-    let newStreak = currentStreak;
-    let newPoints = totalPoints;
-    let newDates: string[] = [];
-
-    // Streak logic: continue, reset, or do nothing
-    if (!lastDate) {
-      newStreak = 1;
-      newDates = [today];
-    } else if (lastDate === yesterday) {
-      newStreak += 1;
-      newDates = [...streakDates, today];
-    } else if (lastDate === today) {
-      return; // already checked in today
-    } else {
-      newStreak = 1;
-      newDates = [today];
-    }
-
-    newPoints += 10;
-
-    // Update local state
-    setCurrentStreak(newStreak);
-    setTotalPoints(newPoints);
-    setStreakDates(newDates);
-    updateMarkedDates(newDates);
-
-    // Persist new streak and points
-    await AsyncStorage.setItem("streak", newStreak.toString());
-    await AsyncStorage.setItem("totalPoints", newPoints.toString());
-    await AsyncStorage.setItem("streakDates", JSON.stringify(newDates));
-  };
-
-  // Set navigation header with user's avatar in top right corner
+  // Set up the navigation header with the user's avatar
   useEffect(() => {
     navigation.setOptions({
-      title: "Events",
+      title: "Events", // 
       headerRight: () => (
         <Pressable
-          onPress={() => router.push("/profile" as const)}
+          onPress={() => router.push("/profile")} // Gos to the profile page
           style={{ marginRight: 15 }}
         >
           <Image
             source={{
-              uri: avatar || "https://i.pravatar.cc/150?img=12", // Fallback image
+              uri: avatar || "https://i.pravatar.cc/150?img=12", // Placeholder avatar
             }}
             style={{
               width: 30,
@@ -149,85 +169,83 @@ export default function Events() {
         </Pressable>
       ),
       headerStyle: {
-        backgroundColor: "#1b1b3a",
+        backgroundColor: "#1b1b3a", // Dark background for the header
       },
-      headerTintColor: "#fff",
+      headerTintColor: "#fff", // White text for header
     });
   }, [navigation, avatar]);
 
-  // Calculate progress bar width based on points
+  // Calculate progress bar width
   const progressPercent = Math.min((totalPoints / maxPoints) * 100, 100);
 
   return (
     <LinearGradient
-      colors={["#0f0c29", "#302b63", "#8e44ad"]}
+      colors={["#0f0c29", "#302b63", "#8e44ad"]} // Fancy Gradient background
       style={styles.container}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
       <View style={styles.calendarWrapper}>
-        {/* Calendar with streak marking and dimmed other-month dates */}
+        {/* Calendar with red dots for events */}
         <Calendar
           onDayPress={handleDayPress}
-          markingType="custom"
+          markingType="dot"
           markedDates={markedDates}
           theme={{
             calendarBackground: "transparent",
             dayTextColor: "#fff",
             monthTextColor: "#fff",
             arrowColor: "#fff",
-            todayTextColor: "#ffd700",
+            todayTextColor: "#ffd700", // Highlight today's date
             selectedDayBackgroundColor: "#6c5ce7",
             selectedDayTextColor: "#fff",
           }}
-          dayComponent={({
-            date,
-            state,
-          }: {
-            date: { dateString: string; day: number };
-            state: "disabled" | "inactive" | "today" | undefined;
-          }) => {
-            const isDimmed = state === "disabled";
-            const mark = markedDates[date.dateString];
-
-            return (
-              <View
-                style={{
-                  backgroundColor: mark?.customStyles?.container?.backgroundColor || "transparent",
-                  borderRadius: 6,
-                  padding: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    color: isDimmed
-                      ? "#666"
-                      : mark?.customStyles?.text?.color || "#fff",
-                    fontWeight: mark?.customStyles?.text?.fontWeight || "normal",
-                    opacity: isDimmed ? 0.5 : 1,
-                    textAlign: "center",
-                  }}
-                >
-                  {date.day}
-                </Text>
-              </View>
-            );
-          }}
         />
 
-        {/* Progress bar section under the calendar */}
+        {/* Progress Bar */}
         <View style={styles.progressOverlay}>
-          <Text style={styles.progressLabel}> {totalPoints} / {maxPoints} points</Text>
+          <Text style={styles.progressLabel}>
+            {totalPoints} / {maxPoints} points
+          </Text>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+            <View
+              style={[styles.progressFill, { width: `${progressPercent}%` }]}
+            />
           </View>
+        </View>
 
-          <Pressable
-            style={styles.rewardsButton}
-            onPress={() => router.push("/rewards" as const)}
-          >
-            <Text style={styles.rewardsText}> View Rewards</Text>
-          </Pressable>
+        {/* Event List */}
+        <View style={styles.eventList}>
+          <Text style={styles.eventListTitle}>Events</Text>
+          <FlatList
+            data={events}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.eventItem}>
+                <View>
+                  <Text style={styles.eventDate}>{item.date}</Text>
+                  <Text style={styles.eventName}>{item.name}</Text>
+                </View>
+                <View style={styles.eventActions}>
+                  {/* Complete Button */}
+                  <Pressable
+                    style={styles.completeButton}
+                    onPress={() => handleCompleteEvent(item.id)}
+                  >
+                    <Ionicons name="checkmark-circle" size={24} color="green" />
+                  </Pressable>
+
+                  {/* Trash Button */}
+                  <Pressable
+                    style={styles.trashButton}
+                    onPress={() => removeEvent(item.id)}
+                  >
+                    <Ionicons name="trash" size={24} color="red" />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          />
         </View>
       </View>
 
@@ -235,7 +253,7 @@ export default function Events() {
       <View style={styles.dashboard}>
         <Pressable
           style={styles.dashboardButton}
-          onPress={() => router.push("/friends" as const)} // Navigate to friends list
+          onPress={() => router.push("/friends")} // Nav to the friends list
         >
           <Ionicons name="people" size={24} color="#fff" />
           <Text style={styles.dashboardText}>Friends</Text>
@@ -243,7 +261,7 @@ export default function Events() {
 
         <Pressable
           style={styles.dashboardButton}
-          onPress={() => router.push("/map" as const)} // Navigate to map page
+          onPress={() => router.push("/map")} // Nav to the map page
         >
           <Ionicons name="earth" size={24} color="#fff" />
           <Text style={styles.dashboardText}>Map</Text>
@@ -252,8 +270,7 @@ export default function Events() {
     </LinearGradient>
   );
 }
-
-// Component styles
+// Style stuff dont touch pls
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -266,7 +283,7 @@ const styles = StyleSheet.create({
   progressOverlay: {
     marginTop: 10,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
     backgroundColor: "transparent",
     alignItems: "center",
   },
@@ -286,16 +303,40 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#6c5ce7",
   },
-  rewardsButton: {
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    backgroundColor: "#4b4b8f",
-    borderRadius: 8,
+  eventList: {
+    marginTop: 20,
+    paddingHorizontal: 10,
   },
-  rewardsText: {
+  eventListTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  eventItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#444",
+  },
+  eventDate: {
     color: "#fff",
     fontSize: 14,
+  },
+  eventName: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  eventActions: {
+    flexDirection: "row",
+  },
+  completeButton: {
+    marginLeft: 10,
+  },
+  trashButton: {
+    marginLeft: 10,
   },
   dashboard: {
     flexDirection: "row",
@@ -315,7 +356,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
-
 
 
 
