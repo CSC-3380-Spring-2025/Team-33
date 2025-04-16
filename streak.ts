@@ -2,6 +2,27 @@ import { useEffect } from "react";
 import { useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+const MAX_POINTS = 1000; // Maximum points for the progress bar
+
+// Function to get the current total points
+export const getTotalPoints = async (): Promise<number> => {
+  const points = await AsyncStorage.getItem("totalPoints");
+  return points ? parseInt(points, 10) : 0;
+};
+
+// Function to add points
+export const addPoints = async (pointsToAdd: number): Promise<number> => {
+  const currentPoints = await getTotalPoints();
+  const newPoints = Math.min(currentPoints + pointsToAdd, MAX_POINTS); // Ensure points cannot exceed MAX_POINTS
+  await AsyncStorage.setItem("totalPoints", newPoints.toString());
+  return newPoints;
+};
+
+// Function to reset points (if needed)
+export const resetPoints = async (): Promise<void> => {
+  await AsyncStorage.setItem("totalPoints", "0");
+};
+
 function useStreak() {
     const [Streak, setStreak] = useState(0);
 
