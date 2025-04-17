@@ -125,7 +125,7 @@ export default function Friends() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Custom Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.push("/")}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
