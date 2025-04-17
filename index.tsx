@@ -136,7 +136,7 @@ export default function Events() {
         const friendsEvents = await fetchFriendsEvents(friendIds);
         setFriendsEvents(friendsEvents); // Store friends' events
         setMarkedDates((prevMarkedDates) =>
-          generateMarkedDates(friendsEvents, "blue", prevMarkedDates) // Mark friends' events in blue
+          generateMarkedDates(friendsEvents, "orange", prevMarkedDates) // Mark friends' events in orange
         );
       }
     } catch (error) {
@@ -411,7 +411,7 @@ export default function Events() {
                     <Text
                       style={[
                         styles.eventName,
-                        item.isFriendEvent && { color: "blue" }, // Different color for friends' events
+                        item.isFriendEvent && { color: "orange" }, // Change friends' events to orange
                       ]}
                     >
                       {item.name}
