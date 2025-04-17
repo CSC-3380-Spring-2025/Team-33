@@ -36,11 +36,19 @@ type MarkedDates = {
 type Event = {
   id: string;
   date: string;
+  time: string; // New property for event time
   name: string;
   isFriendEvent?: boolean;
   friendName?: string;
   friendEmail?: string;
-  chatId?: string; // Added chatId property
+  chatId?: string;
+};
+
+const sortEvents = (a: Event, b: Event) => {
+  if (a.date === b.date) {
+    return a.time.localeCompare(b.time); // Sort by time if dates are the same
+  }
+  return a.date.localeCompare(b.date); // Sort by date
 };
 
 export default function Events() {
@@ -203,23 +211,32 @@ export default function Events() {
       `Enter a name for the event on ${day.dateString}:`,
       (text) => {
         if (text) {
-          addEvent(day.dateString, text);
+          Alert.prompt(
+            "Set Time",
+            "",
+            (time) => {
+              if (time) {
+                addEvent(day.dateString, text, time);
+              }
+            }
+          );
         }
       }
     );
   };
 
   // Add an event to the selected date
-  const addEvent = async (date: string, name: string) => {
+  const addEvent = async (date: string, name: string, time: string) => {
     const newEvent: Event = {
-      id: `${date}-${name}`, // Unique event ID
+      id: `${date}-${name}-${time}`, // Unique event ID
       date,
+      time, // Add time to the event
       name,
       chatId: `${date}-${name}`, // Use the event ID as the chatId
     };
 
     // Add the event to the local list
-    setEvents((prevEvents) => [...prevEvents, newEvent]);
+    setEvents((prevEvents) => [...prevEvents, newEvent].sort(sortEvents));
 
     // Add the red dot to the calendar for this date
     setMarkedDates((prevMarkedDates) => ({
@@ -236,7 +253,7 @@ export default function Events() {
       try {
         const userDocRef = doc(db, "users", userId);
         await updateDoc(userDocRef, {
-          events: [...events, newEvent], // Append the new event to the existing events
+          events: [...events, newEvent].sort(sortEvents), // Append and sort events
         });
       } catch (error) {
         console.error("Error saving event to Firestore:", error);
@@ -382,14 +399,14 @@ export default function Events() {
         <View style={styles.eventList}>
           <Text style={styles.eventListTitle}>Events</Text>
           <FlatList
-            data={[...events, ...friendsEvents]} // Combine user and friends' events
+            data={[...events, ...friendsEvents].sort(sortEvents)} // Combine and sort events
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <Pressable onPress={() => handleEventPress(item)}>
                 <View style={styles.eventItem}>
                   <View>
                     <Text style={styles.eventDate}>
-                      {item.date} {item.isFriendEvent && `- ${item.friendEmail}`} {/* Display friend's email */}
+                      {item.date} {item.time} {item.isFriendEvent && `- ${item.friendEmail}`} {/* Display time and friend's email */}
                     </Text>
                     <Text
                       style={[
@@ -622,8 +639,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-
-
 
 
 
