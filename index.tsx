@@ -322,7 +322,7 @@ export default function Events() {
   // Set up the navigation header with the user's avatar and email
   useEffect(() => {
     navigation.setOptions({
-      title: "Events",
+      title: "Waypoint", // Change the title from "Events" to "Waypoint"
       headerRight: () => (
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           {userEmail && (
