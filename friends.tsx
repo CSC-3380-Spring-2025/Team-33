@@ -15,7 +15,7 @@ export default function Friends() {
   const [friends, setFriends] = useState<Friend[]>([]); // List of friends with their IDs and emails
   const [userId, setUserId] = useState<string | null>(null); // Current user's ID
 
-  // Load the current user's friends list from Firestore in real-time
+  // Load the current user's friends list from Firestore 
   const loadFriends = () => {
     if (!userId) return;
 
@@ -145,13 +145,13 @@ export default function Friends() {
             renderItem={({ item }) => (
               <Pressable
                 style={styles.friendItem}
-                onPress={() => router.push(`/chat/${item.id}`)} // Navigate to the chat page with the friend's ID
+                onPress={() => router.push(`/chat/friendsChat?id=${item.id}`)} // Navigate to the friends chat
               >
                 <Image
                   source={{ uri: "https://via.placeholder.com/50/FFFFFF" }} // Blank profile picture
                   style={styles.profilePicture}
                 />
-                <Text style={styles.friendEmail}>{item.email}</Text>
+                <Text style={styles.friendName}>{item.email}</Text>
               </Pressable>
             )}
           />
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 15,
   },
-  friendEmail: {
+  friendName: {
     color: "#fff",
     fontSize: 16,
   },
