@@ -7,7 +7,7 @@ import { doc, getDoc, updateDoc, arrayUnion, collection, query, where, getDocs, 
 
 type Friend = {
   id: string;
-  email: string;
+  username: string; // Replace email with username
 };
 
 export default function Friends() {
@@ -27,13 +27,13 @@ export default function Friends() {
         const userData = docSnapshot.data();
         const friendIds = userData.friends || [];
 
-        // Fetch friend details (email) for each friend ID
+        // Fetch friend details (username) for each friend ID
         Promise.all(
           friendIds.map(async (friendId: string) => {
             const friendDoc = await getDoc(doc(db, "users", friendId));
             if (friendDoc.exists()) {
               const friendData = friendDoc.data();
-              return { id: friendId, email: friendData.email };
+              return { id: friendId, username: friendData.username || "Unknown" }; // Default to "Unknown" if username is missing
             }
             return null;
           })
@@ -151,7 +151,7 @@ export default function Friends() {
                   source={{ uri: "https://via.placeholder.com/50/FFFFFF" }} // Blank profile picture
                   style={styles.profilePicture}
                 />
-                <Text style={styles.friendName}>{item.email}</Text>
+                <Text style={styles.friendName}>@{item.username}</Text> {/* Display username */}
               </Pressable>
             )}
           />
