@@ -17,7 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import dayjs from "dayjs";
 import { Ionicons } from "@expo/vector-icons";
 import { addPoints } from "./streaks"; // Import point tracking functions
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebaseConfig";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
@@ -65,6 +65,7 @@ export default function Events() {
   const [isSignedIn, setIsSignedIn] = useState(false); // Track user authentication state
   const [userId, setUserId] = useState<string | null>(null); // Track user ID
   const [userEmail, setUserEmail] = useState<string | null>(null); // Track user email
+  const [username, setUsername] = useState<string | null>(""); // Track username
 
   // Progress bar state to track user points
   const [totalPoints, setTotalPoints] = useState(0);
@@ -73,62 +74,36 @@ export default function Events() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
-  // Monitor authentication state
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setIsSignedIn(true);
-        setAvatar("https://via.placeholder.com/150/FFA500"); // Orange profile picture
-        setUserId(user.uid);
-        setUserEmail(user.email); // Set the user's email
+  // Add points and save to Firestore
+  const addPoints = async (pointsToAdd: number) => {
+    if (!userId) return;
 
-        // Load user data from Firestore
-        await loadUserData(user.uid);
-      } else {
-        // Save events to Firestore before clearing local data
-        if (userId) {
-          try {
-            const userDocRef = doc(db, "users", userId);
-            await updateDoc(userDocRef, {
-              events,
-            });
-          } catch (error) {
-            console.error("Error saving events on logout:", error);
-          }
-        }
+    try {
+      const newTotalPoints = totalPoints + pointsToAdd;
 
-        setIsSignedIn(false);
-        setAvatar(null); // Blank profile picture
-        setUserId(null);
-        setUserEmail(null); // Clear the email when signed out
+      // Update points in Firestore
+      await updateDoc(doc(db, "users", userId), {
+        points: newTotalPoints,
+      });
 
-        // Clear local data for non-logged-in users
-        setEvents([]);
-        setMarkedDates({});
-        setTotalPoints(0);
-        await AsyncStorage.clear(); // Clear AsyncStorage when logged out
-      }
-    });
-
-    return unsubscribe; // Cleanup the listener on unmount
-  }, []);
-
-  // Load events and marked dates from Firestore when the app starts
-  useEffect(() => {
-    if (userId) {
-      loadUserData(userId); // Load data only for logged-in users
+      // Update local state
+      setTotalPoints(newTotalPoints);
+    } catch (error) {
+      console.error("Error updating points in Firestore:", error);
     }
-  }, [userId]);
+  };
 
-  // Load user and friends' events from Firestore
+  // Load user data, including points and events
   const loadUserData = async (uid: string) => {
     try {
       const userDoc = await getDoc(doc(db, "users", uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        const userPoints = userData.points || 0; // Default to 0 if points are not set
+        setTotalPoints(userPoints); // Set points from Firestore
+
         const userEvents = userData.events || [];
         setEvents(userEvents); // Set user's own events
-        setTotalPoints(userData.points || 0);
         setMarkedDates(generateMarkedDates(userEvents, "red")); // Mark user's events in red
 
         // Fetch friends' events
@@ -144,6 +119,72 @@ export default function Events() {
     }
   };
 
+  // Save points before logging out
+  const handleSignOut = async () => {
+    try {
+      if (userId) {
+        // Save points to Firestore before logging out
+        await updateDoc(doc(db, "users", userId), {
+          points: totalPoints,
+        });
+      }
+
+      await signOut(auth);
+      onSignOut();
+    } catch (error) {
+      console.error("Error signing out:", error.message);
+    }
+  };
+
+  // Monitor authentication state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsSignedIn(true);
+        setAvatar("https://via.placeholder.com/150/FFA500"); // Placeholder avatar
+        setUserId(user.uid);
+
+        // Fetch user data, including username
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const fetchedUsername = userData.username || ""; // Default to empty string if username is missing
+          setUsername(fetchedUsername);
+
+          // Prompt for username if missing
+          if (!fetchedUsername) {
+            Alert.prompt(
+              "Set Username",
+              "Please enter a username to continue:",
+              async (input) => {
+                if (input) {
+                  await updateDoc(doc(db, "users", user.uid), { username: input });
+                  setUsername(input);
+                } else {
+                  Alert.alert("Error", "Username cannot be empty.");
+                }
+              }
+            );
+          }
+        }
+      } else {
+        setIsSignedIn(false);
+        setAvatar(null);
+        setUserId(null);
+        setUsername(null);
+      }
+    });
+
+    return unsubscribe; // Cleanup the listener on unmount
+  }, []);
+
+  // Load events and marked dates from Firestore when the app starts
+  useEffect(() => {
+    if (userId) {
+      loadUserData(userId); // Load data only for logged-in users
+    }
+  }, [userId]);
+
   // Fetch events created by friends
   const fetchFriendsEvents = async (friendIds: string[]) => {
     try {
@@ -152,13 +193,13 @@ export default function Events() {
         const friendDoc = await getDoc(doc(db, "users", friendId));
         if (friendDoc.exists()) {
           const friendData = friendDoc.data();
-          const friendEmail = friendData.email || "Unknown Friend"; // Use email or fallback
+          const friendUsername = friendData.username || "Unknown Friend"; // Use username or fallback
           const friendEvents = friendData.events || [];
           friendsEvents.push(
             ...friendEvents.map((event: Event) => ({
               ...event,
               isFriendEvent: true, // Mark as a friend's event
-              friendEmail, // Include the friend's email
+              friendName: friendUsername, // Include the friend's username
             }))
           );
         }
@@ -194,7 +235,7 @@ export default function Events() {
         await updateDoc(doc(db, "users", userId), {
           events,
           points: totalPoints,
-          markedDates, // Save marked dates to Firestore
+          markedDates, 
         });
       } catch (error) {
         console.error("Error saving user data:", error);
@@ -261,30 +302,60 @@ export default function Events() {
     }
   };
 
-  // Remove event from the list and update calendar
-  const removeEvent = (eventId: string) => {
+  // Check and remove expired events
+  const checkAndRemoveExpiredEvents = async () => {
+    const now = dayjs(); // Current date and time
+
+    // Filter out expired events
+    const updatedEvents = events.filter((event) => {
+      const eventDateTime = dayjs(`${event.date} ${event.time}`, "YYYY-MM-DD HH:mm");
+      return eventDateTime.isAfter(now); // Keep events that are in the future
+    });
+
+    // Find expired events
+    const expiredEvents = events.filter((event) => {
+      const eventDateTime = dayjs(`${event.date} ${event.time}`, "YYYY-MM-DD HH:mm");
+      return eventDateTime.isBefore(now); // Events that have passed
+    });
+
+    // Remove expired events from Firestore
+    if (expiredEvents.length > 0 && userId) {
+      try {
+        const userDocRef = doc(db, "users", userId);
+        await updateDoc(userDocRef, {
+          events: updatedEvents, // Update Firestore with non-expired events
+        });
+      } catch (error) {
+        console.error("Error removing expired events from Firestore:", error);
+      }
+    }
+
+    // Update local state
+    setEvents(updatedEvents);
+  };
+
+  // Remove event
+  const removeEvent = async (eventId: string) => {
     const updatedEvents = events.filter((event) => event.id !== eventId);
     setEvents(updatedEvents);
 
-    // Update marked days on the calendar
-    const updatedMarkedDates = { ...markedDates };
-
-    // Clear red dots for dates with no events for real this time.
-    Object.keys(markedDates).forEach((date) => {
-      if (!updatedEvents.some((event) => event.date === date)) {
-        delete updatedMarkedDates[date]; // Remove the dot if no events remain for this date
+    // Update Firestore
+    if (userId) {
+      try {
+        const userDocRef = doc(db, "users", userId);
+        await updateDoc(userDocRef, {
+          events: updatedEvents, // Update Firestore with the remaining events
+        });
+      } catch (error) {
+        console.error("Error removing event from Firestore:", error);
       }
-    });
-
-    setMarkedDates(updatedMarkedDates);
+    }
   };
 
-  // functionality for the complete button, adds points and removes the event
+  // Complete event
   const handleCompleteEvent = async (eventId: string) => {
-    await addPoints(10); // Add 10 points for completing event for now
-    const updatedPoints = await AsyncStorage.getItem("totalPoints");
-    setTotalPoints(updatedPoints ? parseInt(updatedPoints, 10) : 0); // Update the progress bar
-    removeEvent(eventId); // ovbiously 
+    await addPoints(10); // Add points for completing the event
+    removeEvent(eventId); // Remove the event locally and from Firestore
   };
 
   const handleEventPress = (event: Event) => {
@@ -325,13 +396,13 @@ export default function Events() {
       title: "Waypoint", // Change the title from "Events" to "Waypoint"
       headerRight: () => (
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {userEmail && (
+          {username && (
             <Text style={{ color: "#fff", marginRight: 10, fontSize: 14 }}>
-              {userEmail}
+              @{username}
             </Text>
           )}
           <Pressable
-            onPress={() => router.push("/profile")}
+            onPress={() => router.push("/profilePage")} // Navigate to the new profilePage file
             style={{ marginRight: 15 }}
           >
             <Image
@@ -354,10 +425,19 @@ export default function Events() {
       },
       headerTintColor: "#fff",
     });
-  }, [navigation, avatar, isSignedIn, userEmail]);
+  }, [navigation, avatar, isSignedIn, username]);
 
   // Calculate progress bar width
   const progressPercent = Math.min((totalPoints / maxPoints) * 100, 100);
+
+  // Periodically check for expired events
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkAndRemoveExpiredEvents(); // Check for expired events every minute
+    }, 60000); // 60,000 ms = 1 minute
+
+    return () => clearInterval(interval); // Cleanup the interval on unmount
+  }, [events, userId]);
 
   return (
     <LinearGradient
@@ -383,6 +463,14 @@ export default function Events() {
           }}
         />
 
+        {/* Rewards Button */}
+        <Pressable
+          style={styles.rewardsButton}
+          onPress={() => router.push("/rewards")} // Navigate to the rewards page
+        >
+          <Text style={styles.rewardsButtonText}>Rewards</Text>
+        </Pressable>
+
         {/* Progress Bar */}
         <View style={styles.progressOverlay}>
           <Text style={styles.progressLabel}>
@@ -406,7 +494,8 @@ export default function Events() {
                 <View style={styles.eventItem}>
                   <View>
                     <Text style={styles.eventDate}>
-                      {item.date} {item.time} {item.isFriendEvent && `- ${item.friendEmail}`} {/* Display time and friend's email */}
+                      {item.date} {item.time}{" "}
+                      {item.isFriendEvent && `- ${item.friendName}`} {/* Display friend's username */}
                     </Text>
                     <Text
                       style={[
@@ -637,6 +726,19 @@ const styles = StyleSheet.create({
   modalButtons: {
     width: "100%",
     marginTop: 10,
+  },
+  rewardsButton: {
+    backgroundColor: "#ffd700", 
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10, 
+  },
+  rewardsButtonText: {
+    color: "#1b1b3a", 
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
 
