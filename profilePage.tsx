@@ -15,6 +15,8 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { doc, updateDoc } from "firebase/firestore"; // Import Firestore functions
+import { auth, db } from "./firebaseConfig"; // Import Firebase configuration
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -94,11 +96,38 @@ export default function ProfileScreen() {
   // Save profile and update original profile snapshot
   const handleSave = async () => {
     setLoading(true);
-    await saveProfile();
-    showToast();
-    setEditing(false);
-    setOriginalProfile({ name, username, bio, avatar });
-    setLoading(false);
+
+    try {
+      // Check if the user is logged in
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("User is not logged in.");
+      }
+
+      // Save profile data to Firestore
+      const userDocRef = doc(db, "users", currentUser.uid);
+      await updateDoc(userDocRef, {
+        name,
+        username,
+        bio,
+        avatar,
+      });
+
+      // Save profile data to AsyncStorage for local persistence
+      await saveProfile();
+
+      // Show success message
+      showToast();
+
+      // Update the original profile snapshot
+      setOriginalProfile({ name, username, bio, avatar });
+      setEditing(false);
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      Alert.alert("Error", "Failed to save profile. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Revert edits and exit edit mode
@@ -126,45 +155,24 @@ export default function ProfileScreen() {
         )}
       </Pressable>
 
-      {/* Editable inputs OR profile display */}
+      {/* Display editable fields when in edit mode */}
       {editing ? (
         <>
           <TextInput
             style={styles.input}
-            placeholder="Name"
-            placeholderTextColor="#ccc"
-            value={name}
-            onChangeText={setName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="#ccc"
+            placeholder="Enter your username"
+            placeholderTextColor="#aaa"
             value={username}
             onChangeText={setUsername}
           />
           <TextInput
             style={[styles.input, styles.bioInput]}
-            placeholder="Bio"
-            placeholderTextColor="#ccc"
+            placeholder="Enter your bio"
+            placeholderTextColor="#aaa"
             value={bio}
             onChangeText={setBio}
             multiline
           />
-        </>
-      ) : (
-        <>
-          <Text style={styles.name}>{name || "No name yet"}</Text>
-          <Text style={styles.username}>
-            {username ? `@${username}` : "No username"}
-          </Text>
-          <Text style={styles.bio}>{bio || "No bio yet"}</Text>
-        </>
-      )}
-
-      {/* Save / Cancel buttons in edit mode */}
-      {editing ? (
-        <>
           <Pressable
             style={[styles.saveButton, loading && { opacity: 0.6 }]}
             onPress={handleSave}
@@ -182,12 +190,19 @@ export default function ProfileScreen() {
           </Pressable>
         </>
       ) : (
-        <Pressable
-          style={styles.editButton}
-          onPress={() => setEditing(true)}
-        >
-          <Text style={styles.editText}>✏️ Edit Profile</Text>
-        </Pressable>
+        <>
+          {/* Display non-editable fields when not in edit mode */}
+          <Text style={styles.username}>
+            {username ? `@${username}` : "No username set"}
+          </Text>
+          <Text style={styles.bio}>{bio || "No bio yet"}</Text>
+          <Pressable
+            style={styles.editButton}
+            onPress={() => setEditing(true)}
+          >
+            <Text style={styles.editText}>✏️ Edit Profile</Text>
+          </Pressable>
+        </>
       )}
 
       {/* Link to settings page */}
@@ -196,6 +211,14 @@ export default function ProfileScreen() {
         onPress={() => router.push("/settings" as const)}
       >
         <Text style={styles.settingsText}>⚙️ Settings</Text>
+      </Pressable>
+
+      {/* Link to profile.tsx */}
+      <Pressable
+        style={styles.profileButton}
+        onPress={() => router.push("/profile")} // Navigate to profile.tsx
+      >
+        <Text style={styles.profileButtonText}>🔧 Account Management</Text>
       </Pressable>
     </KeyboardAvoidingView>
   );
@@ -292,5 +315,17 @@ const styles = StyleSheet.create({
   settingsText: {
     color: "#ccc",
     fontSize: 16,
+  },
+  profileButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: "#4b4b8f",
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  profileButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
   },
 });
