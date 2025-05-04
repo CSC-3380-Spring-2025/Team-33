@@ -2,27 +2,42 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, StyleSheet, Pressable, Alert, ActivityIndicator } from "react-native";
 import { auth, db } from "./firebaseConfig";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
+import { useRouter } from "expo-router"; // Import useRouter for navigation
 
 export default function Profile({ onSignIn, onSignOut }: { onSignIn: (userId: string) => void; onSignOut: () => void }) {
+  const router = useRouter(); // Initialize router for navigation
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Track login state
+  const [userId, setUserId] = useState<string | null>(null);
+  const [totalPoints, setTotalPoints] = useState(0);
 
   // Monitor authentication state
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user); // Set `isLoggedIn` to true if a user is logged in
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+        setUserId(user.uid);
+
+        // Load user data, including points
+        await loadUserData(user.uid);
+      } else {
+        setIsLoggedIn(false);
+        setUserId(null);
+
+        // Clear local data only after saving to Firestore
+        setTotalPoints(0);
+      }
     });
 
-    return unsubscribe; // Cleanup listener on unmount
+    return unsubscribe; // Cleanup the listener on unmount
   }, []);
 
   const handleCreateAccount = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please enter both email and password.");
-      return;
+      return; // Do nothing if email or password is missing
     }
 
     setLoading(true);
@@ -37,10 +52,9 @@ export default function Profile({ onSignIn, onSignOut }: { onSignIn: (userId: st
         friends: [],
       });
 
-      Alert.alert("Success", "Account created successfully!");
       onSignIn(user.uid);
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      console.error("Error creating account:", error.message); // Log the error instead of showing an alert
     } finally {
       setLoading(false);
     }
@@ -48,8 +62,7 @@ export default function Profile({ onSignIn, onSignOut }: { onSignIn: (userId: st
 
   const handleSignIn = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please enter both email and password.");
-      return;
+      return; // Do nothing if email or password is missing
     }
 
     setLoading(true);
@@ -60,13 +73,11 @@ export default function Profile({ onSignIn, onSignOut }: { onSignIn: (userId: st
 
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists()) {
-        Alert.alert("Success", `Welcome back, ${user.email}!`);
         onSignIn(user.uid);
-      } else {
-        Alert.alert("Error", "User data not found in Firestore.");
+        loadUserData(user.uid); // Load user data when user signs in
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      console.error("Error signing in:", error.message); // Log the error instead of showing an alert
     } finally {
       setLoading(false);
     }
@@ -75,15 +86,50 @@ export default function Profile({ onSignIn, onSignOut }: { onSignIn: (userId: st
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      Alert.alert("Success", "You have been signed out.");
       onSignOut();
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      console.error("Error signing out:", error.message); // Log the error instead of showing an alert
+    }
+  };
+
+  const addPoints = async (pointsToAdd: number) => {
+    if (!userId) return;
+
+    try {
+      const newTotalPoints = totalPoints + pointsToAdd;
+
+      // Update points in Firestore
+      await updateDoc(doc(db, "users", userId), {
+        points: newTotalPoints,
+      });
+
+      // Update local state
+      setTotalPoints(newTotalPoints);
+    } catch (error) {
+      console.error("Error updating points in Firestore:", error);
+    }
+  };
+
+  const loadUserData = async (uid: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, "users", uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const userPoints = userData.points || 0; // Default to 0 if points are not set
+        setTotalPoints(userPoints); // Set points from Firestore
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error);
     }
   };
 
   return (
     <View style={styles.container}>
+      {/* Back Button */}
+      <Pressable style={styles.backButton} onPress={() => router.back()}>
+        <Text style={styles.backButtonText}>⬅️ Back</Text>
+      </Pressable>
+
       <Text style={styles.title}>Account Management</Text>
 
       {/* Show inputs and buttons only if the user is not logged in */}
@@ -132,6 +178,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#1b1b3a",
     padding: 20,
+  },
+  backButton: {
+    position: "absolute",
+    top: 40,
+    left: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: "#4b4b8f",
+    borderRadius: 10,
+  },
+  backButtonText: {
+    color: "#fff",
+    fontSize: 16,
   },
   title: {
     fontSize: 24,
