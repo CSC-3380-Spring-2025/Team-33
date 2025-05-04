@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,39 +6,30 @@ import {
   Switch,
   Pressable,
   Alert,
-  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
+import { auth } from "../app/firebaseConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { auth } from "../app/firebaseConfig"; // Firebase auth instance
 
-// Main settings screen
 export default function SettingsScreen() {
   const router = useRouter();
-
-  // Simulated dark mode toggle (doesn't change actual theme yet)
   const [darkMode, setDarkMode] = useState(false);
+  const [radiusMiles, setRadiusMiles] = useState(3); // Default radius
 
-  // Controls visibility of user's profile (true = private, false = public)
-  const [isPrivate, setIsPrivate] = useState(false);
-
-  // Load privacy preference from local storage when screen mounts
   useEffect(() => {
-    const loadPrivacy = async () => {
-      const stored = await AsyncStorage.getItem("privateProfile");
-      if (stored) setIsPrivate(stored === "true");
-    };
-    loadPrivacy();
+    (async () => {
+      const saved = await AsyncStorage.getItem("event_radius_miles");
+      if (saved) setRadiusMiles(parseInt(saved));
+    })();
   }, []);
 
-  // Update local state and persist setting
-  const togglePrivacy = async (value: boolean) => {
-    setIsPrivate(value);
-    await AsyncStorage.setItem("privateProfile", value.toString());
+  const handleRadiusChange = (delta: number) => {
+    let newRadius = Math.min(5, Math.max(1, radiusMiles + delta));
+    setRadiusMiles(newRadius);
+    AsyncStorage.setItem("event_radius_miles", newRadius.toString());
   };
 
-  // Sign user out of Firebase and redirect to login screen
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -51,92 +42,78 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Scrollable content so sections don’t get clipped on smaller screens */}
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.header}>Settings</Text>
+      <Text style={styles.header}>Settings</Text>
 
-        {/* ACCOUNT SECTION  */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-
-          {/* View Profile */}
-          <Pressable style={styles.row} onPress={() => router.push("/profile")}>
-            <Text style={styles.rowText}>View Profile</Text>
-          </Pressable>
-
-          {/* Navigate to Edit Profile screen */}
-          <Pressable style={styles.row} onPress={() => router.push("/profile")}>
-            <Text style={styles.rowText}>Edit Profile</Text>
-          </Pressable>
-        </View>
-
-        {/* PRIVACY SECTION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy</Text>
-
-          {/* Toggle for making the profile private or public */}
-          <View style={styles.row}>
-            <Text style={styles.rowText}>Private Profile</Text>
-            <Switch
-              value={isPrivate}
-              onValueChange={togglePrivacy}
-              thumbColor={isPrivate ? "#fff" : "#888"}
-              trackColor={{ false: "#555", true: "#4b4b8f" }}
-            />
-          </View>
-        </View>
-
-        {/* PREFERENCES SECTION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-
-          {/* Dark mode switch — purely visual for now */}
-          <View style={styles.row}>
-            <Text style={styles.rowText}>Dark Mode</Text>
-            <Switch
-              value={darkMode}
-              onValueChange={(val) => setDarkMode(val)}
-              thumbColor={darkMode ? "#fff" : "#888"}
-              trackColor={{ false: "#555", true: "#4b4b8f" }}
-            />
-          </View>
-        </View>
-
-        {/* SUPPORT SECTION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support</Text>
-
-          {/* Placeholder support/help screen */}
-          <Pressable style={styles.row} onPress={() => Alert.alert("Coming soon!")}>
-            <Text style={styles.rowText}>Help & FAQ</Text>
-          </Pressable>
-
-          {/* Placeholder privacy policy link */}
-          <Pressable style={styles.row} onPress={() => Alert.alert("Coming soon!")}>
-            <Text style={styles.rowText}>Privacy Policy</Text>
-          </Pressable>
-        </View>
-
-        {/* LOG OUT BUTTON */}
-        <Pressable style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Log Out</Text>
+      {/* ACCOUNT SECTION */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Account</Text>
+        <Pressable
+          style={styles.row}
+          onPress={() => router.push("/profile" as const)}
+        >
+          <Text style={styles.rowText}>👤 View Profile</Text>
         </Pressable>
-      </ScrollView>
+      </View>
+
+      {/* PREFERENCES SECTION */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Preferences</Text>
+
+        <View style={styles.row}>
+          <Text style={styles.rowText}>🌓 Dark Mode</Text>
+          <Switch
+            value={darkMode}
+            onValueChange={(val) => setDarkMode(val)}
+            thumbColor={darkMode ? "#fff" : "#888"}
+            trackColor={{ false: "#555", true: "#4b4b8f" }}
+          />
+        </View>
+
+        <View style={styles.row}>
+          <Text style={styles.rowText}>📍 Event Radius</Text>
+          <View style={styles.radiusControls}>
+            <Pressable
+              style={styles.radiusButton}
+              onPress={() => handleRadiusChange(-1)}
+            >
+              <Text style={styles.radiusText}>-</Text>
+            </Pressable>
+            <Text style={styles.radiusValue}>{radiusMiles} mi</Text>
+            <Pressable
+              style={styles.radiusButton}
+              onPress={() => handleRadiusChange(1)}
+            >
+              <Text style={styles.radiusText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      {/* SUPPORT SECTION */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Support</Text>
+        <Pressable style={styles.row} onPress={() => Alert.alert("Coming soon!")}>
+          <Text style={styles.rowText}>📖 Help & FAQ</Text>
+        </Pressable>
+        <Pressable style={styles.row} onPress={() => Alert.alert("Coming soon!")}>
+          <Text style={styles.rowText}>🔒 Privacy Policy</Text>
+        </Pressable>
+      </View>
+
+      {/* LOG OUT */}
+      <Pressable style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>🚪 Log Out</Text>
+      </Pressable>
     </View>
   );
 }
 
-// All styling for layout, colors, spacing, etc.
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1b1b3a", // dark purple background
+    backgroundColor: "#1b1b3a",
     paddingHorizontal: 20,
     paddingTop: 60,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-    paddingRight: 10, // space from scrollbar
   },
   header: {
     fontSize: 28,
@@ -154,12 +131,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#aaa",
     marginBottom: 10,
-    textTransform: "uppercase",
-    letterSpacing: 1,
   },
   row: {
-    paddingVertical: 12,
-    paddingHorizontal: 4, // spacing away from edge + scrollbar
+    paddingVertical: 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -169,15 +143,35 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   logoutButton: {
-    paddingVertical: 14,
+    paddingVertical: 12,
     backgroundColor: "#ff4d4d",
     borderRadius: 8,
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 10,
   },
   logoutText: {
     color: "#fff",
     fontSize: 16,
+  },
+  radiusControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  radiusButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#4b4b8f",
+    borderRadius: 5,
+  },
+  radiusText: {
+    color: "#fff",
+    fontSize: 18,
     fontWeight: "bold",
+  },
+  radiusValue: {
+    color: "#fff",
+    fontSize: 16,
+    marginHorizontal: 8,
   },
 });
