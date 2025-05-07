@@ -11,14 +11,11 @@ import {
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { auth } from "../app/firebaseConfig"; // Firebase auth instance
+import { auth } from "./firebaseConfig"; // Firebase auth instance
 
 // Main settings screen
 export default function SettingsScreen() {
   const router = useRouter();
-
-  // Simulated dark mode toggle (doesn't change actual theme yet)
-  const [darkMode, setDarkMode] = useState(false);
 
   // Controls visibility of user's profile (true = private, false = public)
   const [isPrivate, setIsPrivate] = useState(false);
@@ -49,26 +46,35 @@ export default function SettingsScreen() {
     }
   };
 
+  // Load additional settings from the original settings file
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const storedNotifications = await AsyncStorage.getItem("notificationsEnabled");
+      const storedLocation = await AsyncStorage.getItem("locationEnabled");
+      if (storedNotifications) setNotificationsEnabled(storedNotifications === "true");
+      if (storedLocation) setLocationEnabled(storedLocation === "true");
+    };
+    loadSettings();
+  }, []);
+
+  const toggleNotifications = async (value: boolean) => {
+    setNotificationsEnabled(value);
+    await AsyncStorage.setItem("notificationsEnabled", value.toString());
+  };
+
+  const toggleLocation = async (value: boolean) => {
+    setLocationEnabled(value);
+    await AsyncStorage.setItem("locationEnabled", value.toString());
+  };
+
   return (
     <View style={styles.container}>
       {/* Scrollable content so sections don’t get clipped on smaller screens */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.header}>Settings</Text>
-
-        {/* ACCOUNT SECTION  */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-
-          {/* View Profile */}
-          <Pressable style={styles.row} onPress={() => router.push("/profile")}>
-            <Text style={styles.rowText}>View Profile</Text>
-          </Pressable>
-
-          {/* Navigate to Edit Profile screen */}
-          <Pressable style={styles.row} onPress={() => router.push("/profile")}>
-            <Text style={styles.rowText}>Edit Profile</Text>
-          </Pressable>
-        </View>
 
         {/* PRIVACY SECTION */}
         <View style={styles.section}>
@@ -90,31 +96,27 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferences</Text>
 
-          {/* Dark mode switch — purely visual for now */}
+          {/* Notifications toggle */}
           <View style={styles.row}>
-            <Text style={styles.rowText}>Dark Mode</Text>
+            <Text style={styles.rowText}>Enable Notifications</Text>
             <Switch
-              value={darkMode}
-              onValueChange={(val) => setDarkMode(val)}
-              thumbColor={darkMode ? "#fff" : "#888"}
+              value={notificationsEnabled}
+              onValueChange={toggleNotifications}
+              thumbColor={notificationsEnabled ? "#fff" : "#888"}
               trackColor={{ false: "#555", true: "#4b4b8f" }}
             />
           </View>
-        </View>
 
-        {/* SUPPORT SECTION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support</Text>
-
-          {/* Placeholder support/help screen */}
-          <Pressable style={styles.row} onPress={() => Alert.alert("Coming soon!")}>
-            <Text style={styles.rowText}>Help & FAQ</Text>
-          </Pressable>
-
-          {/* Placeholder privacy policy link */}
-          <Pressable style={styles.row} onPress={() => Alert.alert("Coming soon!")}>
-            <Text style={styles.rowText}>Privacy Policy</Text>
-          </Pressable>
+          {/* Location toggle */}
+          <View style={styles.row}>
+            <Text style={styles.rowText}>Enable Location</Text>
+            <Switch
+              value={locationEnabled}
+              onValueChange={toggleLocation}
+              thumbColor={locationEnabled ? "#fff" : "#888"}
+              trackColor={{ false: "#555", true: "#4b4b8f" }}
+            />
+          </View>
         </View>
 
         {/* LOG OUT BUTTON */}
