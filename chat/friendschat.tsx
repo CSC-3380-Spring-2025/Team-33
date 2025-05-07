@@ -30,7 +30,7 @@ export default function FriendsChat() {
       setMessages(fetchedMessages);
     });
 
-    return () => unsubscribe(); /
+    return () => unsubscribe(); 
   }, [chatId]);
 
   const sendMessage = async () => {
