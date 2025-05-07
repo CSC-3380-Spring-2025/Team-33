@@ -11,7 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { auth } from "../app//firebaseConfig"; // Firebase instance
+import { auth } from "../app/firebaseConfig"; // Firebase auth instance
 
 // Main settings screen
 export default function SettingsScreen() {
