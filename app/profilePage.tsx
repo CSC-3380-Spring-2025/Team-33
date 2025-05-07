@@ -17,9 +17,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { doc, updateDoc } from "firebase/firestore"; // Import Firestore functions
 import { auth, db } from "./firebaseConfig"; // Import Firebase configuration
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Import Firebase Storage functions
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const storage = getStorage(); // Initialize Firebase Storage
 
   // Editable profile state
   const [name, setName] = useState("");
@@ -80,7 +82,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // Handle image selection from gallery
+  // Handle image selection from gallery and upload to Firebase Storage
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -89,7 +91,22 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled && result.assets[0].uri) {
-      setAvatar(result.assets[0].uri);
+      const imageUri = result.assets[0].uri;
+
+      try {
+        // Upload image to Firebase Storage
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const storageRef = ref(storage, `avatars/${auth.currentUser?.uid}`);
+        await uploadBytes(storageRef, blob);
+
+        // Get the download URL of the uploaded image
+        const downloadURL = await getDownloadURL(storageRef);
+        setAvatar(downloadURL); // Update avatar state with the download URL
+      } catch (error) {
+        console.error("Error uploading image:", error);
+        Alert.alert("Error", "Failed to upload image. Please try again.");
+      }
     }
   };
 
@@ -107,20 +124,16 @@ export default function ProfileScreen() {
       // Save profile data to Firestore
       const userDocRef = doc(db, "users", currentUser.uid);
       await updateDoc(userDocRef, {
-        name,
         username,
         bio,
-        avatar,
+        avatar, // Save the avatar URL to Firestore
       });
-
-      // Save profile data to AsyncStorage for local persistence
-      await saveProfile();
 
       // Show success message
       showToast();
 
       // Update the original profile snapshot
-      setOriginalProfile({ name, username, bio, avatar });
+      setOriginalProfile({ username, bio, avatar });
       setEditing(false);
     } catch (error) {
       console.error("Error saving profile:", error);
