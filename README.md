@@ -7,8 +7,8 @@ Design Lead: Md Islam (misla69)\
 Quality Assurance Tester: Morris Henry (Mo-Henry)
 
 # About Our Software
+Our app is designed to allow you to make and see plans for you and your friends. Create events that your friends can see and RSVP to without the hassle. 
 
-Describe a little about what the project is about here.
 ## Platforms Tested on
 - iOS
 # Important Links
@@ -58,33 +58,28 @@ Install the Expo Go app from the App Store or Google Play Store.
 Scan the QR code displayed in the terminal or browser using the Expo Go app.
 
 ## Dependencies
-- List all dependencies here
-- Don't forget to include versions
+-Node.js
+
 - 
 ### Downloading Dependencies
-Describe where to download the dependencies here. Some will likely require a web download. Provide links here. For IDE extensions, make sure your project works with the free version of them, and detail which IDE(s) these are available in. 
+Ensure Node.js is installed on the computer. If not, download and install it from https://nodejs.org/en
+Ensure all required packages are installed. If any are missing, install them manually:
+```sh
+npm install @react-native-async-storage/async-storage
+npm install @react-native-community/datetimepicker
+npm install firebase
+npm install react-native-calendars
+npm install expo-router
+```
 
 ## Commands
-Describe how the commands and process to launch the project on the main branch in such a way that anyone working on the project knows how to check the affects of any code they add.
-
+use
 ```sh
-Example terminal command syntax
+ npx expo start
 ```
+in the terminal to start the app.
 
-It is very common in these sections to see code in peculiar boxes to help them stand out. Check the markdown section of the Project Specifications to see how to add more / customize these.
 
-```python
-def code_highlight_example(m: int, m: float, s: str) -> str:
-	return s + str(n*m)
-```
-
-```java
-public static void main(String[] args){
-	System.out.println("Hello, World!");
-}
-```
-
-```c#
 static void Main(){
 	Console.WriteLine("Hello, World!");
 }
