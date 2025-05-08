@@ -1,0 +1,27 @@
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main() {
+    string username, password;
+    
+    // Predefined correct username and password
+    string correctUsername = "admin";
+    string correctPassword = "password123";
+
+    // User input
+    cout << "Enter username: ";
+    cin >> username;
+    cout << "Enter password: ";
+    cin >> password;
+
+    // Authentication check
+    if (username == correctUsername && password == correctPassword) {
+        cout << "Login successful! Welcome, " << username << "!\n";
+    } else {
+        cout << "Invalid username or password. Try again.\n";
+    }
+
+    return 0;
+}
