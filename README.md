@@ -46,7 +46,14 @@ Install Expo CLI (if not already installed)
 npm install -g expo-cli
 ```
 Run the App
-On a Physical Device:
+
+Input:
+
+```sh
+npx expo start
+```
+
+Then on a Physical Device:
 Install the Expo Go app from the App Store or Google Play Store.
 Scan the QR code displayed in the terminal or browser using the Expo Go app.
 
