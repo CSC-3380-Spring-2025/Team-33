@@ -15,9 +15,10 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { doc, updateDoc } from "firebase/firestore"; // Import Firestore functions
+import { doc, updateDoc, onSnapshot, getDoc, setDoc } from "firebase/firestore"; // Import Firestore functions
 import { auth, db } from "./firebaseConfig"; // Import Firebase configuration
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Import Firebase Storage functions
+import { onAuthStateChanged } from "firebase/auth"; // Import onAuthStateChanged for authentication state monitoring
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -110,29 +111,54 @@ export default function ProfileScreen() {
     }
   };
 
+  // Listen for authentication state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setUsername(userData.username || "");
+          setAvatar(userData.avatar || "");
+        }
+      } else {
+        setUsername("");
+        setAvatar("");
+      }
+    });
+
+    return unsubscribe; // Cleanup the listener on unmount
+  }, []);
+
   // Save profile and update original profile snapshot
   const handleSave = async () => {
     setLoading(true);
 
     try {
-      // Check if the user is logged in
       const currentUser = auth.currentUser;
       if (!currentUser) {
         throw new Error("User is not logged in.");
       }
 
-      // Save profile data to Firestore
       const userDocRef = doc(db, "users", currentUser.uid);
-      await updateDoc(userDocRef, {
-        username,
-        bio,
-        avatar, // Save the avatar URL to Firestore
-      });
+      const userDoc = await getDoc(userDocRef);
 
-      // Show success message
+      if (userDoc.exists()) {
+        // Update the existing document
+        await updateDoc(userDocRef, {
+          username,
+          avatar,
+        });
+      } else {
+        // Create a new document if it doesn't exist
+        await setDoc(userDocRef, {
+          username,
+          avatar,
+          bio: bio || "", // Include bio if available
+        });
+      }
+
       showToast();
-
-      // Update the original profile snapshot
       setOriginalProfile({ username, bio, avatar });
       setEditing(false);
     } catch (error) {
