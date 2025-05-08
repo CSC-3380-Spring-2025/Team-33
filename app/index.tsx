@@ -19,7 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { addPoints } from "./streaks"; // Import point tracking functions
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebaseConfig";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 
 type MarkedDates = {
@@ -42,6 +42,8 @@ type Event = {
   friendName?: string;
   friendEmail?: string;
   chatId?: string;
+  rsvpList?: string[]; // List of user IDs who RSVP'd
+  rsvpCount?: number; // Number of RSVPs
 };
 
 const sortEvents = (a: Event, b: Event) => {
@@ -271,7 +273,7 @@ export default function Events() {
     const newEvent: Event = {
       id: `${date}-${name}-${time}`, // Unique event ID
       date,
-      time, // Add time to the event
+      time: time, // Add time to the event
       name,
       chatId: `${date}-${name}`, // Use the event ID as the chatId
     };
@@ -439,6 +441,79 @@ export default function Events() {
     return () => clearInterval(interval); // Cleanup the interval on unmount
   }, [events, userId]);
 
+  // RSVP to a friend's event
+  const toggleRSVP = async (eventId: string) => {
+    if (!userId) return;
+
+    const event = friendsEvents.find((e) => e.id === eventId) || events.find((e) => e.id === eventId);
+    if (!event) return;
+
+    const eventDocRef = doc(db, "events", eventId);
+
+    try {
+      const eventDoc = await getDoc(eventDocRef);
+
+      if (!eventDoc.exists()) {
+        // Create the event document if it doesn't exist
+        await setDoc(eventDocRef, {
+          rsvpList: [],
+          rsvpCount: 0,
+        });
+      }
+
+      const isRSVPd = event.rsvpList?.includes(userId);
+
+      if (isRSVPd) {
+        // Remove RSVP
+        await updateDoc(eventDocRef, {
+          rsvpList: arrayRemove(userId),
+          rsvpCount: (event.rsvpCount || 1) - 1,
+        });
+      } else {
+        // Add RSVP
+        await updateDoc(eventDocRef, {
+          rsvpList: arrayUnion(userId),
+          rsvpCount: (event.rsvpCount || 0) + 1,
+        });
+      }
+
+      // Update local state
+      event.rsvpList = isRSVPd
+        ? event.rsvpList.filter((id) => id !== userId)
+        : [...(event.rsvpList || []), userId];
+      event.rsvpCount = isRSVPd ? (event.rsvpCount || 1) - 1 : (event.rsvpCount || 0) + 1;
+
+      setFriendsEvents([...friendsEvents]);
+      setEvents([...events]);
+    } catch (error) {
+      console.error("Error toggling RSVP:", error);
+    }
+  };
+
+  // Open a tab to list attendees
+  const openAttendeesTab = async (eventId: string) => {
+    const event = friendsEvents.find((e) => e.id === eventId) || events.find((e) => e.id === eventId);
+    if (!event || !event.rsvpList) return;
+
+    try {
+      const usernames = await Promise.all(
+        event.rsvpList.map(async (userId) => {
+          const userDoc = await getDoc(doc(db, "users", userId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            return userData.username || "Unknown"; // Default to "Unknown" if username is missing
+          }
+          return "Unknown";
+        })
+      );
+
+      Alert.alert("Attendees", usernames.join(", ") || "No attendees yet.");
+    } catch (error) {
+      console.error("Error fetching attendees' usernames:", error);
+      Alert.alert("Error", "Failed to load attendees. Please try again.");
+    }
+  };
+
   return (
     <LinearGradient
       colors={["#0f0c29", "#302b63", "#8e44ad"]} // Fancy Gradient background
@@ -566,6 +641,34 @@ export default function Events() {
                   >
                     <Text style={styles.buttonText}>Go to Chat</Text>
                   </Pressable>
+
+                  {/* RSVP Button */}
+                  {selectedEvent.isFriendEvent && (
+                    <Pressable
+                      style={styles.rsvpButton}
+                      onPress={() => toggleRSVP(selectedEvent.id)}
+                    >
+                      <Text style={styles.buttonText}>
+                        {selectedEvent.rsvpList?.includes(userId) ? "Cancel RSVP" : "RSVP"}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {/* Attendees Button */}
+                  <Pressable
+                    style={styles.attendeesButton}
+                    onPress={() => openAttendeesTab(selectedEvent.id)}
+                  >
+                    <Text style={styles.buttonText}>View Attendees</Text>
+                  </Pressable>
+
+                  {/* Close Button */}
+                  <Pressable
+                    style={styles.closeButton}
+                    onPress={() => setIsModalVisible(false)}
+                  >
+                    <Text style={styles.buttonText}>Close</Text>
+                  </Pressable>
                 </View>
               </>
             )}
@@ -672,7 +775,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   chatButton: {
-    backgroundColor: "#6c5ce7",
+    backgroundColor: "#ff69b4", // Dark pink
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  closeButton: {
+    backgroundColor: "#6c5ce7", // Purple gradient
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  rsvpButton: {
+    backgroundColor: "#ff9a9e", // Light pink gradient
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  attendeesButton: {
+    backgroundColor: "#ffa500", // Orange
     padding: 10,
     borderRadius: 5,
     alignItems: "center",
@@ -741,6 +863,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+
 
 
 
